@@ -5,64 +5,51 @@ data-protection systems for other engineers and API consumers.
 
 At Capital One I work on identity and access management. I enforce access
 across 50,000+ employees and 4,000+ AWS accounts, run OAuth and JWT
-service-to-service auth, rotate secrets through Vault and AWS Secrets
-Manager, and designed credential propagation with a 500/day revocation cap
-and a staging queue, so one bad rotation cannot revoke everything at once.
-Before IAM I worked on data retention, and before that on account ingestion,
-where I reimplemented a Java service in Go and sustained 2.4k req/s in load
-testing.
+service-to-service auth, and rotate secrets through Vault and AWS Secrets
+Manager. I designed credential propagation with a 500/day revocation cap and
+a staging queue, so one bad rotation cannot revoke everything at once. Before
+IAM I worked on data retention, and before that on account ingestion, where I
+reimplemented a Java service in Go and sustained 2.4k req/s in load testing.
 
 Go is my primary language. Outside work I pick a workflow that annoys me and
 build the whole toolchain to replace it.
 
 ## Projects
 
-**job-search.** A multi-tenant job search platform: ATS ingest,
-resume-variant scoring, referral-gated applications, and outcome analytics.
-The Next.js layer owns no database. It mints a short-lived service token for
-an internal Go API, and that API owns the entire schema. The repo holds 69
-migrations, 150 test files, and custom go-ruleguard lint rules that have
-tests of their own. Go, Next.js, Neon Postgres, and a FastAPI embedding
-sidecar. Source is private.
+| Project | What it is | Stack |
+|---|---|---|
+| **job-search** *(private)* | Multi-tenant job platform: ATS ingest, resume-variant scoring, referral-gated applications, outcome analytics | Go, Next.js, Neon Postgres |
+| [**seakim-design-system**](https://github.com/christophercuongkim/seakim-design-system) | One platform-neutral rule set, with a React binding and a Flutter binding proving it. 38 decision records, 41 components | Dart, TypeScript |
+| [**studio**](https://github.com/christophercuongkim/studio) | Every stage of a personal video in one static Go binary | Go |
+| [**fantasy-hub**](https://github.com/christophercuongkim/fantasy-hub) | NFL fantasy analytics: projections, simulation, hot and cold storage tiers | Python, Next.js, DuckDB |
+| **Juntio** *(private)* | Group trip planning: chat, plan voting, shared itinerary, expense splitting, on iOS, Android, and web | Flutter, Go, Postgres |
+| [**dotfiles**](https://github.com/christophercuongkim/dotfiles) | NixOS on a Framework 13, built on the flake-parts dendritic pattern | Nix |
+| [**zmk-config**](https://github.com/christophercuongkim/zmk-config) | Wireless split Corne firmware: five layers, two custom hold-tap behaviors | Devicetree |
 
-**[seakim-design-system](https://github.com/christophercuongkim/seakim-design-system).**
-One platform-neutral rule set, proven by a React binding and a Flutter
-binding. It carries 38 numbered decision records and 41 React components.
-Each binding declares which rules version it was reviewed against, and a
-binding may lag that version but never lead it. CI runs a conformance
-self-test that checks every rule fires on a bad fixture and stays quiet on a
-good one, so the gate cannot pass while doing nothing. Four of my other repos
-consume it.
-
-**[studio](https://github.com/christophercuongkim/studio).** Every stage of a
-personal video in one static Go binary: script, shoot, ingest, review,
-rename, scaffold a kdenlive project, generate chapters, run QC, build
-thumbnails, upload, and archive. It also searches across every shoot I have
-ingested. The binary is 12,660 lines of Go and depends on four third-party
-modules, with no CLI framework, no web framework, and no database. Three web
-UIs compile in through `go:embed`. Every destructive command takes
-`--dry-run`, and `apply` writes a journal so `undo` works.
-
-**[fantasy-hub](https://github.com/christophercuongkim/fantasy-hub).** NFL
-fantasy analytics. A FastAPI service runs projections and simulation, Neon
-Postgres holds the hot tier, DuckDB queries Parquet for the cold tier, and d3
-draws the charts. It ingests from the Yahoo Fantasy API and runs at
+Running at [juntio.io](https://juntio.io) and
 [fantasy.chriskim.cloud](https://fantasy.chriskim.cloud).
 
-**Juntio.** Group trip planning: chat, propose and vote on plans, build a
-shared itinerary, and split expenses. One Flutter codebase covers iOS,
-Android, and web, over a Go backend and Postgres. TestFlight releases run on
-manual dispatch, because macOS runner minutes bill at roughly ten times the
-Linux rate. It runs at [juntio.io](https://juntio.io). Source is private.
+## How job-search is wired
 
-**[dotfiles](https://github.com/christophercuongkim/dotfiles).** NixOS on a
-Framework 13, built on the flake-parts dendritic pattern so hosts and
-features compose as separate modules. Hyprland, Ghostty, tmux, and Neovim.
+<img src="job-search-architecture.svg" alt="A browser calls a Next.js BFF that owns no database. The BFF signs a short-lived HS256 service token and calls an internal Go API, which owns the entire schema and reaches Neon Postgres through pgx with SQL generated by sqlc. A FastAPI sidecar beside the Go API serves embeddings." width="520">
 
-**[zmk-config](https://github.com/christophercuongkim/zmk-config).** Firmware
-for a wireless split Corne. It defines five layers and two custom devicetree
-hold-tap behaviors, raises Bluetooth transmit power, and sets a one-day idle
-timeout. CI builds the flashable artifacts.
+The web layer holds no schema and no database credentials. It signs a token
+and asks. One service owns the data, so there is one place to change a table
+and one place to get it wrong. 150 test files stand up real Postgres through
+testcontainers rather than mocking it.
+
+## Two worth opening
+
+**studio** is 12,660 lines of Go that depend on four third-party modules,
+with no CLI framework, no web framework, and no database. Per-video state is
+plain files. Three web UIs compile in through `go:embed`. Every destructive
+command takes `--dry-run`, and `apply` writes a journal so `undo` works.
+
+**seakim-design-system** keeps its rules platform-neutral and makes each
+binding declare which rules version it was reviewed against, so a binding may
+lag that version but never lead it. CI runs a conformance self-test that
+checks every rule fires on a bad fixture and stays quiet on a good one, so the
+gate cannot pass while doing nothing.
 
 ## How I work
 
@@ -78,13 +65,12 @@ Tailscale tailnet. GitHub Actions joins that tailnet as an ephemeral,
 ACL-tagged node using OAuth client credentials, because GitHub's own webhooks
 cannot reach a private address.
 
-Each project carries a `CONTEXT.md` that defines its domain terms, and every
-term lists the words not to use for it.
+Each project carries a `CONTEXT.md` defining its domain terms, and every term
+lists the words not to use for it.
 
-I write comments that give the reason and the number behind it. The comment
-explaining why CI splits into separate api and web jobs sits next to the
-measurement that forced the split: 75% of the repository's Actions minutes
-went to the api job.
+My comments give the reason and the number behind it. The one explaining why
+CI splits into separate api and web jobs sits next to the measurement that
+forced the split: 75% of the repository's Actions minutes went to the api job.
 
 ## Background
 
